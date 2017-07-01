@@ -35,8 +35,16 @@ string hasData(string s) {
 // Evaluate a polynomial.
 double polyeval(Eigen::VectorXd coeffs, double x) {
   double result = 0.0;
-  for (int i = 0; i < coeffs.size(); i++) {
+  for (int i = 0; i < coeffs.size(); ++i) {
     result += coeffs[i] * pow(x, i);
+  }
+  return result;
+}
+
+double deriv_eval(Eigen::VectorXd coeffs, double x) {
+  double result = 0.0;
+  for (int i = 1; i < coeffs.size(); ++i) {
+    result += i * coeffs[i] * pow(x, (i - 1));
   }
   return result;
 }
@@ -107,24 +115,44 @@ int main() {
             ptsy_[i] = -d_x * sin(psi) + d_y * cos(psi);
           }
 
-          // linear is not enough
+          // order 3 polynomial
           auto coeffs = polyfit(ptsx_, ptsy_, 3);
-          double cte = polyeval(coeffs, 0);
-          double epsi = -atan(coeffs[1]); // first derivative in 0
 
-//          // Add support for latency
-//          const double latency = 0.1; // 100 ms
-//          const double Lf = 2.67;
-//          double steer_value = j[1]["steering_angle"];
-//          double throttle_value = j[1]["throttle"];
-//          double delayed_x = v_ms * latency * cos(steer_value);
-//          double delayed_y = v_ms * latency * sin(steer_value);
-//          double delayed_psi = - v_ms * steer_value * latency / Lf;
-//          double delayed_v = v_ms + throttle_value * latency;
+          //Display the waypoints/reference line
+          // YELLOW
+          vector<double> next_x_vals;
+          vector<double> next_y_vals;
+          double poly_inc = 2.5;
+          int num_points = 25;
+          for (int i = 1; i < num_points; i++)
+          {
+            next_x_vals.push_back(poly_inc*i);
+            next_y_vals.push_back(polyeval(coeffs, poly_inc*i));
+          }
+
+          // polyeal and deriv eval at point 0
+          double cte = coeffs[0];
+          double epsi = -atan(coeffs[1]);
+
+          // compensation for latency
+          const double latency = 0.1; // 100 ms
+          const double Lf = 2.67;
+          double steering_angle = j[1]["steering_angle"];
+          double throttle = j[1]["throttle"];
+
+          // steering_angle = steering_angle * deg2rad(25); // correction for simulator
+
+          double latency_distance = v_ms * latency;
+          double delayed_x = latency_distance; // assuming linear approximation for distance, which is not correct
+          double delayed_y = 0;
+          double delayed_psi = - steering_angle * latency_distance / Lf; // latency_distance / Lf * ///  steering_angle * deg2rad(25) * latency
+          double delayed_v = v_ms + throttle * latency;
+          double delayed_cte = cte + latency_distance  * sin(epsi);
+          double delayed_epsi = epsi + steering_angle;
 
           // fill the state in vehicle coordinates, so position and angle is always zero
           Eigen::VectorXd state(6);
-          state << 0, 0, 0, v_ms, cte, epsi;
+          state << delayed_x, delayed_y, delayed_psi, delayed_v, delayed_cte, delayed_epsi;
 
           auto vars = mpc.Solve(state, coeffs);
 
@@ -147,17 +175,6 @@ int main() {
           msgJson["mpc_x"] = mpc_x_vals;
           msgJson["mpc_y"] = mpc_y_vals;
 
-          //Display the waypoints/reference line
-          // YELLOW
-          vector<double> next_x_vals;
-          vector<double> next_y_vals;
-          double poly_inc = 2.5;
-          int num_points = 25;
-          for (int i = 1; i < num_points; i++)
-          {
-            next_x_vals.push_back(poly_inc*i);
-            next_y_vals.push_back(polyeval(coeffs, poly_inc*i));
-          }
           msgJson["next_x"] = next_x_vals;
           msgJson["next_y"] = next_y_vals;
 
@@ -174,7 +191,7 @@ int main() {
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
-          // TODO: restore this this_thread::sleep_for(chrono::milliseconds(100));
+          this_thread::sleep_for(chrono::milliseconds(100));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {

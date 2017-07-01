@@ -6,7 +6,6 @@
 using CppAD::AD;
 
 // Simulations handles only 10 timesteps calculation withing 100 ms. less steps adds instability into prediction
-// for dt range from 30 ms to 250 ms were sweeped, 120 seems like ideal value, produces smooth rides
 const size_t N = 10;
 const double dt = 0.1;
 
@@ -55,20 +54,20 @@ public:
 
     // The part of the cost based on the reference state.
     for (int t = 0; t < N; t++) {
-      fg[0] += 10 * CppAD::pow(vars[cte_start + t], 2); // 1000
-      fg[0] += 10 * CppAD::pow(vars[epsi_start + t], 2); // 300
+      fg[0] += 10 * CppAD::pow(vars[cte_start + t], 2);
+      fg[0] += 10 * CppAD::pow(vars[epsi_start + t], 2);
       fg[0] += CppAD::pow(vars[v_start + t] - ref_v, 2);
     }
 
     // Minimize the use of actuators.
     for (int t = 0; t < N - 1; t++) {
-      fg[0] += 100 * CppAD::pow(vars[delta_start + t], 2); // 10
+      fg[0] += 100 * CppAD::pow(vars[delta_start + t], 2);
       fg[0] += CppAD::pow(vars[a_start + t], 2); // 50
     }
 
     // Minimize the value gap between sequential actuations.
     for (int t = 0; t < N - 2; t++) {
-      fg[0] += 1200 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2); //100
+      fg[0] += 1500 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2); //100
       fg[0] += CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
     }
 
