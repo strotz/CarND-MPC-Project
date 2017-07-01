@@ -101,7 +101,6 @@ int main() {
           double psi = j[1]["psi"]; // radians
           double v_mph = j[1]["speed"]; // mph
 
-          // TODO: convert to meters
           double v_ms = v_mph * 0.44704; // now in meters/sec
 
           int n = ptsx.size();
@@ -122,12 +121,11 @@ int main() {
           // YELLOW
           vector<double> next_x_vals;
           vector<double> next_y_vals;
-          double poly_inc = 2.5;
-          int num_points = 25;
+          int num_points = ptsx_.size();
           for (int i = 1; i < num_points; i++)
           {
-            next_x_vals.push_back(poly_inc*i);
-            next_y_vals.push_back(polyeval(coeffs, poly_inc*i));
+            next_x_vals.push_back(ptsx_[i]);
+            next_y_vals.push_back(ptsy_[i]);
           }
 
           // polyeal and deriv eval at point 0
@@ -140,15 +138,13 @@ int main() {
           double steering_angle = j[1]["steering_angle"];
           double throttle = j[1]["throttle"];
 
-          // steering_angle = steering_angle * deg2rad(25); // correction for simulator
-
           double latency_distance = v_ms * latency;
-          double delayed_x = latency_distance; // assuming linear approximation for distance, which is not correct
-          double delayed_y = 0;
-          double delayed_psi = - steering_angle * latency_distance / Lf; // latency_distance / Lf * ///  steering_angle * deg2rad(25) * latency
+          double delayed_x = latency_distance * cos(steering_angle);
+          double delayed_y = - latency_distance * sin(steering_angle);
+          double delayed_psi = - steering_angle * latency_distance / Lf;
           double delayed_v = v_ms + throttle * latency;
           double delayed_cte = cte + latency_distance  * sin(epsi);
-          double delayed_epsi = epsi + steering_angle;
+          double delayed_epsi = epsi + delayed_psi;
 
           // fill the state in vehicle coordinates, so position and angle is always zero
           Eigen::VectorXd state(6);
