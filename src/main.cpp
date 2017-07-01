@@ -87,22 +87,14 @@ int main() {
           // j[1] is the data JSON object
           vector<double> ptsx = j[1]["ptsx"];
           vector<double> ptsy = j[1]["ptsy"];
-          double px = j[1]["x"];
-          double py = j[1]["y"];
-          double psi = j[1]["psi"];
-          double v = j[1]["speed"];
-          double steer_value = j[1]["steering_angle"];
-          double throttle_value = j[1]["throttle"];
 
-          // Add support for latency
-          const double latency = 0.1; // 100 ms
-          const double Lf = 2.67;
-          const double v_ms = v * 0.44704;
+          double px = j[1]["x"]; // meters
+          double py = j[1]["y"]; // meters
+          double psi = j[1]["psi"]; // radians
+          double v_mph = j[1]["speed"]; // mph
 
-          px = px + v_ms * cos(psi) * latency;
-          py = py + v_ms * sin(psi) * latency;
-          psi = psi - v_ms * steer_value * latency / Lf;
-          v = v + throttle_value * latency;
+          // TODO: convert to meters
+          double v_ms = v_mph * 0.44704; // now in meters/sec
 
           int n = ptsx.size();
           Eigen::VectorXd ptsx_(n);
@@ -116,18 +108,28 @@ int main() {
           }
 
           // linear is not enough
-          auto coeffs = polyfit(ptsx_, ptsy_, 2);
+          auto coeffs = polyfit(ptsx_, ptsy_, 3);
           double cte = polyeval(coeffs, 0);
-          double epsi = -atan(coeffs[1]);
+          double epsi = -atan(coeffs[1]); // first derivative in 0
+
+//          // Add support for latency
+//          const double latency = 0.1; // 100 ms
+//          const double Lf = 2.67;
+//          double steer_value = j[1]["steering_angle"];
+//          double throttle_value = j[1]["throttle"];
+//          double delayed_x = v_ms * latency * cos(steer_value);
+//          double delayed_y = v_ms * latency * sin(steer_value);
+//          double delayed_psi = - v_ms * steer_value * latency / Lf;
+//          double delayed_v = v_ms + throttle_value * latency;
 
           // fill the state in vehicle coordinates, so position and angle is always zero
           Eigen::VectorXd state(6);
-          state << 0, 0, 0, v, cte, epsi;
+          state << 0, 0, 0, v_ms, cte, epsi;
 
           auto vars = mpc.Solve(state, coeffs);
 
-          steer_value = vars[0] / deg2rad(25); // from rad to [-1 1]
-          throttle_value = vars[1];
+          double steer_value = vars[0] / deg2rad(25); // from rad to [-1 1]
+          double throttle_value = vars[1];
 
           json msgJson;
           msgJson["steering_angle"] = steer_value;
@@ -172,7 +174,7 @@ int main() {
           //
           // NOTE: REMEMBER TO SET THIS TO 100 MILLISECONDS BEFORE
           // SUBMITTING.
-          this_thread::sleep_for(chrono::milliseconds(100));
+          // TODO: restore this this_thread::sleep_for(chrono::milliseconds(100));
           ws.send(msg.data(), msg.length(), uWS::OpCode::TEXT);
         }
       } else {

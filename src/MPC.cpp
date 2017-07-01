@@ -8,7 +8,7 @@ using CppAD::AD;
 // Simulations handles only 10 timesteps calculation withing 100 ms. less steps adds instability into prediction
 // for dt range from 30 ms to 250 ms were sweeped, 120 seems like ideal value, produces smooth rides
 const size_t N = 10;
-const double dt = 0.12;
+const double dt = 0.1;
 
 const size_t state_size = 6;
 const size_t actuators_size = 2;
@@ -25,7 +25,7 @@ const size_t actuators_size = 2;
 // This is the length from front to CoG that has a similar radius.
 const double Lf = 2.67;
 
-double ref_v = 90;
+double ref_v = 30;
 
 // The solver takes all the state variables and actuator
 // variables in a singular vector. Thus, we should to establish
@@ -55,20 +55,20 @@ public:
 
     // The part of the cost based on the reference state.
     for (int t = 0; t < N; t++) {
-      fg[0] += 1000 * CppAD::pow(vars[cte_start + t], 2);
-      fg[0] += 300 * CppAD::pow(vars[epsi_start + t], 2);
+      fg[0] += 10 * CppAD::pow(vars[cte_start + t], 2); // 1000
+      fg[0] += 10 * CppAD::pow(vars[epsi_start + t], 2); // 300
       fg[0] += CppAD::pow(vars[v_start + t] - ref_v, 2);
     }
 
     // Minimize the use of actuators.
     for (int t = 0; t < N - 1; t++) {
-      fg[0] += 10 * CppAD::pow(vars[delta_start + t], 2);
-      fg[0] += 50 * CppAD::pow(vars[a_start + t], 2);
+      fg[0] += 100 * CppAD::pow(vars[delta_start + t], 2); // 10
+      fg[0] += CppAD::pow(vars[a_start + t], 2); // 50
     }
 
     // Minimize the value gap between sequential actuations.
     for (int t = 0; t < N - 2; t++) {
-      fg[0] += 100 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+      fg[0] += 1200 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2); //100
       fg[0] += CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
     }
 
@@ -110,8 +110,8 @@ public:
       AD<double> delta0 = vars[delta_start + t - 1];
       AD<double> a0 = vars[a_start + t - 1];
 
-      AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * x0 * x0;
-      AD<double> psides0 = CppAD::atan(2*coeffs[2]* x0 + coeffs[1]);
+      AD<double> f0 = coeffs[0] + coeffs[1] * x0 + coeffs[2] * CppAD::pow(x0, 2) + coeffs[3] * CppAD::pow(x0, 3);
+      AD<double> psides0 = CppAD::atan(3 * coeffs[3] * CppAD::pow(x0, 2) + 2 * coeffs[2] * x0 + coeffs[1]);
 
       // The equations for the model:
       // x_[t] = x[t-1] + v[t-1] * cos(psi[t-1]) * dt
@@ -248,8 +248,8 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
   ok &= solution.status == CppAD::ipopt::solve_result<Dvector>::success;
 
   // Cost
-  auto cost = solution.obj_value;
-  std::cout << "Cost " << cost << std::endl;
+  //auto cost = solution.obj_value;
+  //std::cout << "Cost " << cost << std::endl;
   //cout << solution.x[delta_start] << endl;
 
   vector<double> result = {
